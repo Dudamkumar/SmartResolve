@@ -1,0 +1,38 @@
+package com.smartresolve.backend.controller;
+
+import com.smartresolve.backend.dto.auth.UserResponse;
+import com.smartresolve.backend.dto.user.UserUpdateRequest;
+import com.smartresolve.backend.service.UserService;
+
+import jakarta.validation.Valid;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    private final UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
+
+    @GetMapping
+    public List<UserResponse> getAllUsers() {
+        return userService.getAllUsers();
+    }
+
+    @PutMapping("/{id}/role")
+    public ResponseEntity<UserResponse> updateUserRole(
+            @PathVariable Long id,
+            @Valid @RequestBody UserUpdateRequest request) {
+
+        return ResponseEntity.ok(
+                userService.updateUserRole(id, request)
+        );
+    }
+}

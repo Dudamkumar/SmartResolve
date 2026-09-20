@@ -1,0 +1,54 @@
+package com.smartresolve.backend.service;
+
+import com.smartresolve.backend.entity.Complaint;
+import com.smartresolve.backend.entity.Notification;
+import com.smartresolve.backend.entity.Role;
+import com.smartresolve.backend.entity.User;
+import com.smartresolve.backend.enums.NotificationType;
+import com.smartresolve.backend.repository.NotificationRepository;
+import com.smartresolve.backend.repository.UserRepository;
+
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class NotificationService {
+
+    private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+
+    public NotificationService(
+            NotificationRepository notificationRepository,
+            UserRepository userRepository) {
+
+        this.notificationRepository = notificationRepository;
+        this.userRepository = userRepository;
+    }
+
+    public void createSlaBreachNotifications(
+            Complaint complaint) {
+
+        List<User> supervisors =
+                userRepository.findByRole(Role.SUPERVISOR);
+
+        for (User supervisor : supervisors) {
+
+            Notification notification =
+                    new Notification();
+
+            notification.setUser(supervisor);
+            notification.setComplaint(complaint);
+            notification.setType(
+                    NotificationType.SLA_BREACH);
+
+            notification.setMessage(
+                    "SLA breached for complaint ID "
+                    + complaint.getId()
+                    + ": "
+                    + complaint.getTitle());
+
+            notificationRepository.save(notification);
+        }
+    }
+}

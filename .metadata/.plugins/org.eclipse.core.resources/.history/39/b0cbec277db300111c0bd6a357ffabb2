@@ -1,0 +1,221 @@
+package com.smartresolve.backend.service;
+
+import com.smartresolve.backend.dto.auth.LoginRequest;
+import com.smartresolve.backend.dto.auth.RegisterRequest;
+import com.smartresolve.backend.dto.auth.UserResponse;
+import com.smartresolve.backend.dto.user.UserUpdateRequest;
+
+import com.smartresolve.backend.entity.Department;
+import com.smartresolve.backend.entity.Role;
+import com.smartresolve.backend.entity.User;
+
+import com.smartresolve.backend.repository.DepartmentRepository;
+import com.smartresolve.backend.repository.UserRepository;
+
+import com.smartresolve.backend.security.JwtService;
+
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import com.smartresolve.backend.dto.auth.LoginResponse;
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final DepartmentRepository departmentRepository;
+    private final JwtService jwtService;
+
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            DepartmentRepository departmentRepository,
+            JwtService jwtService) {
+
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.departmentRepository = departmentRepository;
+        this.jwtService = jwtService;
+    }
+
+    // =========================================================
+    // REGISTER
+    // =========================================================
+
+    public UserResponse registerUser(
+            RegisterRequest request) {
+
+        if (userRepository.existsByEmail(
+                request.getEmail())) {
+
+            throw new IllegalArgumentException(
+                    "Email is already registered");
+        }
+
+        User user = new User();
+
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
+        );
+
+        // Normal registration creates USER
+        user.setRole(Role.USER);
+
+        User savedUser =
+                userRepository.save(user);
+
+        return new UserResponse(
+                savedUser.getId(),
+                savedUser.getName(),
+                savedUser.getEmail(),
+                savedUser.getRole()
+        );
+    }
+
+    // =========================================================
+    // LOGIN
+    // =========================================================
+
+    public UserResponse loginUser(
+            LoginRequest request) {
+
+        User user = userRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() ->
+                        new BadCredentialsException(
+                                "Invalid email or password"
+                        )
+                );
+
+        boolean passwordMatches =
+                passwordEncoder.matches(
+                        request.getPassword(),
+                        user.getPassword()
+                );
+
+        if (!passwordMatches) {
+
+            throw new BadCredentialsException(
+                    "Invalid email or password"
+            );
+        }
+
+        // Generate SmartResolve JWT
+        String token =
+                jwtService.generateToken(
+                        user.getEmail()
+                );
+
+        System.out.println(
+                "LOGIN EMAIL = "
+                        + user.getEmail()
+        );
+
+        System.out.println(
+                "GENERATED TOKEN = "
+                        + token
+        );
+
+        // Return token directly through constructor
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole(),
+                token
+        );
+    }
+
+    // =========================================================
+    // UPDATE USER ROLE
+    // =========================================================
+
+    public UserResponse updateUserRole(
+            Long userId,
+            UserUpdateRequest request) {
+
+        User user = userRepository
+                .findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "User not found"
+                        )
+                );
+
+        user.setRole(request.getRole());
+
+        if (request.getDepartmentId() != null) {
+
+            Department department =
+                    departmentRepository.findById(
+                            request.getDepartmentId()
+                    ).orElseThrow(() ->
+                            new RuntimeException(
+                                    "Department not found"
+                            )
+                    );
+
+            user.setDepartment(department);
+        }
+
+        User updatedUser =
+                userRepository.save(user);
+
+        return new UserResponse(
+                updatedUser.getId(),
+                updatedUser.getName(),
+                updatedUser.getEmail(),
+                updatedUser.getRole()
+        );
+    }
+
+    // =========================================================
+    // GET ALL USERS
+    // =========================================================
+
+    public List<UserResponse> getAllUsers() {
+
+        return userRepository
+                .findAll()
+                .stream()
+                .map(user ->
+                        new UserResponse(
+                                user.getId(),
+                                user.getName(),
+                                user.getEmail(),
+                                user.getRole()
+                        )
+                )
+                .toList();
+    }
+
+    // =========================================================
+    // CURRENT USER
+    // =========================================================
+
+    public UserResponse getCurrentUser(
+            String email) {
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "User not found"
+                        )
+                );
+
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole()
+        );
+    }
+}

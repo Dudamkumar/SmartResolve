@@ -1,0 +1,64 @@
+package com.smartresolve.backend.controller;
+
+import com.smartresolve.backend.dto.complaint.ComplaintRequest;
+import com.smartresolve.backend.entity.Complaint;
+import com.smartresolve.backend.service.ComplaintService;
+
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import com.smartresolve.backend.dto.complaint.ComplaintResponse;
+import com.smartresolve.backend.dto.complaint.ComplaintAssignmentRequest;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/complaints")
+public class ComplaintController {
+
+    private final ComplaintService complaintService;
+
+    public ComplaintController(ComplaintService complaintService) {
+        this.complaintService = complaintService;
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ComplaintResponse  createComplaint(
+            @Valid @RequestBody ComplaintRequest request,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        return complaintService.createComplaint(request, email);
+    }
+    @GetMapping("/my")
+    public List<ComplaintResponse> getMyComplaints(
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        return complaintService.getMyComplaints(email);
+    }
+    @GetMapping
+    public List<ComplaintResponse> getAllComplaints() {
+
+        return complaintService.getAllComplaints();
+    }
+
+    @GetMapping("/{id}")
+    public ComplaintResponse getComplaintById(
+            @PathVariable Long id) {
+
+        return complaintService.getComplaintById(id);
+    }
+    @PutMapping("/{id}/assign")
+    public ComplaintResponse assignComplaint(
+            @PathVariable Long id,
+            @Valid @RequestBody ComplaintAssignmentRequest request) {
+
+        return complaintService.assignComplaint(id, request);
+    }
+    
+}

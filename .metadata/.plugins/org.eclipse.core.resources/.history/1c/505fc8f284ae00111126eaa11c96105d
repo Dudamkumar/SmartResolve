@@ -1,0 +1,5 @@
+package com.smartresolve.backend.dto.user;
+
+public class UserUpdateRequest {
+
+}

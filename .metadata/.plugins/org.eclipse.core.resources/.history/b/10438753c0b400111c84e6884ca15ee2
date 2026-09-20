@@ -1,0 +1,5 @@
+package com.smartresolve.backend.entity;
+
+public class Role {
+
+}

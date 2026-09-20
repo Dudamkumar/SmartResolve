@@ -1,0 +1,226 @@
+package com.smartresolve.backend.service;
+
+import com.smartresolve.backend.dto.complaint.ComplaintRequest;
+import com.smartresolve.backend.dto.complaint.ComplaintResponse;
+import com.smartresolve.backend.entity.Complaint;
+import com.smartresolve.backend.entity.User;
+import com.smartresolve.backend.enums.ComplaintStatus;
+import com.smartresolve.backend.repository.ComplaintRepository;
+import com.smartresolve.backend.repository.UserRepository;
+import com.smartresolve.backend.dto.complaint.ComplaintAssignmentRequest;
+import org.springframework.stereotype.Service;
+import com.smartresolve.backend.dto.complaint.ComplaintStatusRequest;
+import com.smartresolve.backend.entity.ComplaintHistory;
+import com.smartresolve.backend.repository.ComplaintHistoryRepository;
+import java.util.List;
+
+@Service
+public class ComplaintService {
+
+    private final ComplaintRepository complaintRepository;
+    private final UserRepository userRepository;
+    private final ComplaintHistoryRepository complaintHistoryRepository;
+    
+    private final SlaService slaService; 
+    public ComplaintService(
+            ComplaintRepository complaintRepository,
+            UserRepository userRepository,
+            ComplaintHistoryRepository complaintHistoryRepository,
+            SlaService slaService) {
+
+        this.complaintRepository = complaintRepository;
+        this.userRepository = userRepository;
+        this.complaintHistoryRepository = complaintHistoryRepository;
+        this.slaService = slaService;
+    }
+
+    public ComplaintResponse createComplaint(
+            ComplaintRequest request,
+            String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        Complaint complaint = new Complaint();
+
+        complaint.setTitle(request.getTitle());
+        complaint.setDescription(request.getDescription());
+        complaint.setPriority(request.getPriority());
+        complaint.setCategory(request.getCategory());
+        complaint.setStatus(ComplaintStatus.OPEN);
+        complaint.setCreatedBy(user);
+
+        Complaint savedComplaint =
+                complaintRepository.save(complaint);
+
+        return toResponse(savedComplaint);
+    }
+
+    public List<ComplaintResponse> getAllComplaints() {
+
+        return complaintRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public ComplaintResponse getComplaintById(Long id) {
+
+        Complaint complaint = complaintRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Complaint not found"));
+
+        return toResponse(complaint);
+    }
+
+    public List<ComplaintResponse> getMyComplaints(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        return complaintRepository
+                .findByCreatedById(user.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private ComplaintResponse toResponse(Complaint complaint) {
+
+        ComplaintResponse response = new ComplaintResponse();
+
+        response.setId(complaint.getId());
+        response.setTitle(complaint.getTitle());
+        response.setDescription(complaint.getDescription());
+        response.setStatus(complaint.getStatus());
+        response.setPriority(complaint.getPriority());
+        response.setCategory(complaint.getCategory());
+
+        // Created by user
+        if (complaint.getCreatedBy() != null) {
+
+            response.setCreatedById(
+                    complaint.getCreatedBy().getId());
+
+            response.setCreatedByName(
+                    complaint.getCreatedBy().getName());
+
+            response.setCreatedByEmail(
+                    complaint.getCreatedBy().getEmail());
+        }
+
+        // Assigned support user
+        if (complaint.getAssignedTo() != null) {
+
+            response.setAssignedToId(
+                    complaint.getAssignedTo().getId());
+
+            response.setAssignedToName(
+                    complaint.getAssignedTo().getName());
+
+            response.setAssignedToEmail(
+                    complaint.getAssignedTo().getEmail());
+        }
+
+        response.setCreatedAt(complaint.getCreatedAt());
+        response.setUpdatedAt(complaint.getUpdatedAt());
+        response.setResolvedAt(complaint.getResolvedAt());
+
+        return response;
+    }
+    public ComplaintResponse assignComplaint(
+            Long complaintId,
+            ComplaintAssignmentRequest request) {
+
+        Complaint complaint = complaintRepository.findById(complaintId)
+                .orElseThrow(() ->
+                        new RuntimeException("Complaint not found"));
+
+        User supportUser = userRepository.findById(
+                request.getAssignedToId()
+        ).orElseThrow(() ->
+                new RuntimeException("Support user not found"));
+
+        if (!supportUser.getRole().name().equals("SUPPORT")) {
+            throw new RuntimeException(
+                    "Selected user is not a SUPPORT user");
+        }
+
+        complaint.setAssignedTo(supportUser);
+
+        Complaint savedComplaint =
+                complaintRepository.save(complaint);
+
+        // Reload complaint so both relationships are available
+        Complaint updatedComplaint =
+                complaintRepository.findById(savedComplaint.getId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Complaint not found"));
+
+        return toResponse(updatedComplaint);
+    }
+    public ComplaintResponse updateStatus(
+            Long complaintId,
+            ComplaintStatusRequest request,
+            String email) {
+
+        Complaint complaint = complaintRepository.findById(complaintId)
+                .orElseThrow(() ->
+                        new RuntimeException("Complaint not found"));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        ComplaintStatus currentStatus = complaint.getStatus();
+        ComplaintStatus newStatus = request.getStatus();
+
+        // OPEN → IN_PROGRESS
+        if (currentStatus == ComplaintStatus.OPEN &&
+                newStatus != ComplaintStatus.IN_PROGRESS) {
+
+            throw new RuntimeException(
+                    "OPEN complaint can only move to IN_PROGRESS");
+        }
+
+        // IN_PROGRESS → RESOLVED
+        if (currentStatus == ComplaintStatus.IN_PROGRESS &&
+                newStatus != ComplaintStatus.RESOLVED) {
+
+            throw new RuntimeException(
+                    "IN_PROGRESS complaint can only move to RESOLVED");
+        }
+
+        // RESOLVED → CLOSED
+        if (currentStatus == ComplaintStatus.RESOLVED &&
+                newStatus != ComplaintStatus.CLOSED) {
+
+            throw new RuntimeException(
+                    "RESOLVED complaint can only move to CLOSED");
+        }
+
+        // Create history record BEFORE changing status
+        ComplaintHistory history = new ComplaintHistory();
+
+        history.setComplaint(complaint);
+        history.setChangedBy(user);
+        history.setOldStatus(currentStatus);
+        history.setNewStatus(newStatus);
+
+        complaintHistoryRepository.save(history);
+
+        // Update complaint
+        complaint.setStatus(newStatus);
+
+        if (newStatus == ComplaintStatus.RESOLVED) {
+            complaint.setResolvedAt(java.time.LocalDateTime.now());
+        }
+
+        Complaint savedComplaint =
+                complaintRepository.save(complaint);
+
+        return toResponse(savedComplaint);
+    }
+}

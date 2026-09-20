@@ -1,0 +1,5 @@
+package com.smartresolve.backend.dto.complaint;
+
+public class ComplaintStatusRequest {
+
+}

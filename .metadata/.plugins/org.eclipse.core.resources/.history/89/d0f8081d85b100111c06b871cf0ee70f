@@ -1,0 +1,5 @@
+package com.smartresolve.backend.service;
+
+public class CommentService {
+
+}

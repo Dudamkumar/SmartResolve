@@ -1,0 +1,91 @@
+package com.smartresolve.backend.security;
+
+import com.smartresolve.backend.entity.Role;
+import com.smartresolve.backend.entity.User;
+import com.smartresolve.backend.repository.UserRepository;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@Component
+public class OAuth2SuccessHandler
+        extends SimpleUrlAuthenticationSuccessHandler {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+
+    public OAuth2SuccessHandler(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService) {
+
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+    }
+
+    @Override
+    public void onAuthenticationSuccess(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Authentication authentication)
+            throws IOException, ServletException {
+
+        OAuth2User oauthUser =
+                (OAuth2User) authentication.getPrincipal();
+
+        String email =
+                oauthUser.getAttribute("email");
+
+        String name =
+                oauthUser.getAttribute("name");
+
+        if (email == null) {
+            throw new RuntimeException(
+                    "Google email not found");
+        }
+
+        User user = userRepository
+                .findByEmail(email)
+                .orElseGet(() -> {
+
+                    User newUser = new User();
+
+                    newUser.setName(name);
+                    newUser.setEmail(email);
+                    newUser.setRole(Role.USER);
+
+                    newUser.setPassword(
+                            passwordEncoder.encode(
+                                    UUID.randomUUID().toString()
+                            )
+                    );
+
+                    return userRepository.save(newUser);
+                });
+
+        String jwt =
+                jwtService.generateToken(user.getEmail());
+
+        String redirectUrl =
+                "http://localhost:5173/oauth2/callback?token="
+                + jwt;
+
+        getRedirectStrategy().sendRedirect(
+                request,
+                response,
+                redirectUrl
+        );
+    }
+}

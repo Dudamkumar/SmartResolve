@@ -1,0 +1,5 @@
+package com.smartresolve.backend.repository;
+
+public class NotificationRepository {
+
+}

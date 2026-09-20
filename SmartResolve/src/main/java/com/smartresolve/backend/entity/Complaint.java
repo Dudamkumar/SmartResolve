@@ -1,0 +1,186 @@
+package com.smartresolve.backend.entity;
+
+import com.smartresolve.backend.enums.ComplaintCategory;
+import com.smartresolve.backend.enums.ComplaintPriority;
+import com.smartresolve.backend.enums.ComplaintStatus;
+
+import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "complaints")
+public class Complaint {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ComplaintStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ComplaintPriority priority;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ComplaintCategory category;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User createdBy;
+
+    @ManyToOne
+    @JoinColumn(name = "assigned_to")
+    private User assignedTo;
+
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department department;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime resolvedAt;
+    private Integer slaHours;
+    private LocalDateTime slaDeadline;
+    @Column(nullable = false)
+    private boolean slaBreached = false;
+    
+    public Complaint() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public ComplaintStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ComplaintStatus status) {
+        this.status = status;
+    }
+
+    public ComplaintPriority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(ComplaintPriority priority) {
+        this.priority = priority;
+    }
+
+    public ComplaintCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(ComplaintCategory category) {
+        this.category = category;
+    }
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public User getAssignedTo() {
+        return assignedTo;
+    }
+
+    public void setAssignedTo(User assignedTo) {
+        this.assignedTo = assignedTo;
+    }
+
+    public Department getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(Department department) {
+        this.department = department;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(LocalDateTime resolvedAt) {
+        this.resolvedAt = resolvedAt;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+    
+    public Integer getSlaHours() {
+        return slaHours;
+    }
+
+    public void setSlaHours(Integer slaHours) {
+        this.slaHours = slaHours;
+    }
+
+    public LocalDateTime getSlaDeadline() {
+        return slaDeadline;
+    }
+
+    public void setSlaDeadline(LocalDateTime slaDeadline) {
+        this.slaDeadline = slaDeadline;
+    }
+
+    public boolean isSlaBreached() {
+        return slaBreached;
+    }
+
+    public void setSlaBreached(boolean slaBreached) {
+        this.slaBreached = slaBreached;
+    }
+}

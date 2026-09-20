@@ -1,0 +1,183 @@
+package com.smartresolve.backend.config;
+
+import com.smartresolve.backend.security.JwtAuthenticationFilter;
+import com.smartresolve.backend.security.OAuth2SuccessHandler;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import org.springframework.http.HttpStatus;
+
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+@Configuration
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            OAuth2SuccessHandler oAuth2SuccessHandler) {
+
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
+
+        http
+
+            // -------------------------------------------------
+            // CSRF
+            // -------------------------------------------------
+            .csrf(csrf -> csrf.disable())
+
+            // -------------------------------------------------
+            // Session
+            // IF_REQUIRED allows OAuth2 login to use a session
+            // while your REST APIs still use JWT.
+            // -------------------------------------------------
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(
+                            SessionCreationPolicy.IF_REQUIRED
+                    )
+            )
+
+            // -------------------------------------------------
+            // IMPORTANT:
+            // /api/** should return 401 instead of redirecting
+            // to Google login.
+            // -------------------------------------------------
+            .exceptionHandling(exception ->
+                    exception.defaultAuthenticationEntryPointFor(
+                            new HttpStatusEntryPoint(
+                                    HttpStatus.UNAUTHORIZED
+                            ),
+                            new AntPathRequestMatcher("/api/**")
+                    )
+            )
+
+            // -------------------------------------------------
+            // AUTHORIZATION
+            // -------------------------------------------------
+            .authorizeHttpRequests(auth -> auth
+
+                    // Public authentication endpoints
+                    .requestMatchers(
+                            "/api/auth/register",
+                            "/api/auth/login"
+                    ).permitAll()
+
+                    // OAuth2 endpoints
+                    .requestMatchers(
+                            "/oauth2/**",
+                            "/login/**"
+                    ).permitAll()
+
+                    // -----------------------------------------
+                    // Test endpoints
+                    // -----------------------------------------
+                    .requestMatchers("/api/test/user")
+                    .hasRole("USER")
+
+                    .requestMatchers("/api/test/support")
+                    .hasRole("SUPPORT")
+
+                    .requestMatchers("/api/test/supervisor")
+                    .hasRole("SUPERVISOR")
+
+                    .requestMatchers("/api/test/admin")
+                    .hasRole("ADMIN")
+
+                    // -----------------------------------------
+                    // User management
+                    // -----------------------------------------
+                    .requestMatchers("/api/users/**")
+                    .hasRole("ADMIN")
+
+                    // -----------------------------------------
+                    // Complaint assignment
+                    // -----------------------------------------
+                    .requestMatchers("/api/complaints/*/assign")
+                    .hasAnyRole(
+                            "ADMIN",
+                            "SUPERVISOR"
+                    )
+
+                    // -----------------------------------------
+                    // Complaint status
+                    // -----------------------------------------
+                    .requestMatchers("/api/complaints/*/status")
+                    .hasAnyRole(
+                            "SUPPORT",
+                            "SUPERVISOR",
+                            "ADMIN"
+                    )
+
+                    // -----------------------------------------
+                    // Complaint comments
+                    // -----------------------------------------
+                    .requestMatchers(
+                            "/api/complaints/*/comments/**"
+                    )
+                    .hasAnyRole(
+                            "USER",
+                            "SUPPORT",
+                            "SUPERVISOR",
+                            "ADMIN"
+                    )
+
+                    // -----------------------------------------
+                    // Notifications
+                    // -----------------------------------------
+                    .requestMatchers("/api/notifications")
+                    .authenticated()
+
+                    .requestMatchers("/api/notifications/**")
+                    .authenticated()
+
+                    // -----------------------------------------
+                    // Dashboard
+                    // -----------------------------------------
+                    .requestMatchers("/api/dashboard")
+                    .hasAnyRole(
+                            "SUPERVISOR",
+                            "ADMIN"
+                    )
+
+                    // -----------------------------------------
+                    // Everything else
+                    // -----------------------------------------
+                    .anyRequest().authenticated()
+            )
+
+            // -------------------------------------------------
+            // GOOGLE OAUTH2
+            // -------------------------------------------------
+            .oauth2Login(oauth ->
+                    oauth.successHandler(
+                            oAuth2SuccessHandler
+                    )
+            )
+
+            // -------------------------------------------------
+            // JWT FILTER
+            // -------------------------------------------------
+            .addFilterBefore(
+                    jwtAuthenticationFilter,
+                    UsernamePasswordAuthenticationFilter.class
+            );
+
+        return http.build();
+    }
+}

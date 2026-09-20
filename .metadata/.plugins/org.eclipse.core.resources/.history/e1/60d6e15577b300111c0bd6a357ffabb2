@@ -1,0 +1,107 @@
+package com.smartresolve.backend.service;
+
+import com.smartresolve.backend.dto.auth.RegisterRequest;
+import com.smartresolve.backend.dto.auth.UserResponse;
+import com.smartresolve.backend.dto.user.UserUpdateRequest;
+import com.smartresolve.backend.entity.Department;
+import com.smartresolve.backend.entity.Role;
+import com.smartresolve.backend.entity.User;
+import com.smartresolve.backend.repository.DepartmentRepository;
+import com.smartresolve.backend.repository.UserRepository;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final DepartmentRepository departmentRepository;
+
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            DepartmentRepository departmentRepository) {
+
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.departmentRepository = departmentRepository;
+    }
+
+    public UserResponse registerUser(RegisterRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException(
+                    "Email is already registered");
+        }
+
+        User user = new User();
+
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPassword(
+                passwordEncoder.encode(request.getPassword())
+        );
+
+        // Normal registration always creates USER
+        user.setRole(Role.USER);
+
+        User savedUser = userRepository.save(user);
+
+        return new UserResponse(
+                savedUser.getId(),
+                savedUser.getName(),
+                savedUser.getEmail(),
+                savedUser.getRole()
+        );
+    }
+
+    public UserResponse updateUserRole(
+            Long userId,
+            UserUpdateRequest request) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found"));
+
+        user.setRole(request.getRole());
+
+        if (request.getDepartmentId() != null) {
+
+            Department department =
+                    departmentRepository.findById(
+                            request.getDepartmentId()
+                    ).orElseThrow(() ->
+                            new RuntimeException(
+                                    "Department not found"
+                            ));
+
+            user.setDepartment(department);
+        }
+
+        User updatedUser = userRepository.save(user);
+
+        return new UserResponse(
+                updatedUser.getId(),
+                updatedUser.getName(),
+                updatedUser.getEmail(),
+                updatedUser.getRole()
+        );
+    }
+
+    public List<UserResponse> getAllUsers() {
+
+        return userRepository.findAll()
+                .stream()
+                .map(user -> new UserResponse(
+                        user.getId(),
+                        user.getName(),
+                        user.getEmail(),
+                        user.getRole()
+                ))
+                .toList();
+    }
+}
