@@ -71,7 +71,7 @@ export default function Login() {
 
   const handleGoogleLogin = () => {
     window.location.href =
-      "http://localhost:8080/oauth2/authorization/google";
+      "https://smartresolve-2.onrender.com/oauth2/authorization/google";
   };
 
   return (
