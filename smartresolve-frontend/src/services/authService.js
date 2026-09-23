@@ -15,7 +15,7 @@ const authService = {
 
   googleLogin() {
     window.location.href =
-      "https://smartresolve-2.onrender.com/oauth2/authorization/google";
+      "https://smartresolve-3.onrender.com/oauth2/authorization/google";
   },
 };
 
