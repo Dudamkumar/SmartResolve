@@ -12,35 +12,30 @@ import userService from "../../services/userService";
 export default function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
-  const [supportUsers, setSupportUsers] = useState([]);
+ 
   const [stats, setStats] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [assigningId, setAssigningId] = useState(null);
-  const [assignMessage, setAssignMessage] = useState("");
-
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  /* =====================================================
+     LOAD DASHBOARD
+  ===================================================== */
 
   const loadDashboard = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const [
-        complaintsResponse,
-        statsResponse,
-        usersResponse,
-        supportResponse,
-      ] = await Promise.all([
-        complaintService.getAll(),
-        dashboardService.getStats(),
-        userService.getAll(),
-        userService.getSupportUsers(),
-      ]);
+const [
+    statsResponse,
+    complaintsResponse,
+    usersResponse
+] = await Promise.all([
+    dashboardService.getStats(),
+    complaintService.getAll(),
+    userService.getAll()
+]);
 
       setComplaints(
         Array.isArray(complaintsResponse.data)
@@ -48,17 +43,11 @@ export default function AdminDashboard() {
           : []
       );
 
-      setStats(statsResponse.data || null);
+      setStats(statsResponse.data || {});
 
       setUsers(
         Array.isArray(usersResponse.data)
           ? usersResponse.data
-          : []
-      );
-
-      setSupportUsers(
-        Array.isArray(supportResponse.data)
-          ? supportResponse.data
           : []
       );
     } catch (err) {
@@ -76,43 +65,13 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAssignment = async (
-    complaintId,
-    supportUserId
-  ) => {
-    if (!supportUserId) {
-      return;
-    }
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
-    try {
-      setAssigningId(complaintId);
-      setAssignMessage("");
-      setError("");
-
-      await complaintService.assign(
-        complaintId,
-        Number(supportUserId)
-      );
-
-      setAssignMessage(
-        "Complaint assigned successfully."
-      );
-
-      await loadDashboard();
-    } catch (err) {
-      console.error(
-        "ASSIGNMENT ERROR:",
-        err
-      );
-
-      setError(
-        err.response?.data?.message ||
-          "Unable to assign complaint."
-      );
-    } finally {
-      setAssigningId(null);
-    }
-  };
+  /* =====================================================
+     ROLE COUNTS
+  ===================================================== */
 
   const roleCounts = useMemo(() => {
     return {
@@ -134,6 +93,10 @@ export default function AdminDashboard() {
     };
   }, [users]);
 
+  /* =====================================================
+     RECENT COMPLAINTS
+  ===================================================== */
+
   const recentComplaints = useMemo(() => {
     return [...complaints]
       .sort((a, b) => {
@@ -150,6 +113,10 @@ export default function AdminDashboard() {
       .slice(0, 5);
   }, [complaints]);
 
+  /* =====================================================
+     CRITICAL COMPLAINTS
+  ===================================================== */
+
   const criticalComplaints = useMemo(() => {
     return complaints.filter(
       (complaint) =>
@@ -157,6 +124,10 @@ export default function AdminDashboard() {
         complaint.status !== "CLOSED"
     ).length;
   }, [complaints]);
+
+  /* =====================================================
+     UNASSIGNED COMPLAINTS
+  ===================================================== */
 
   const unassignedComplaints = useMemo(() => {
     return complaints.filter(
@@ -166,8 +137,13 @@ export default function AdminDashboard() {
     ).length;
   }, [complaints]);
 
+  /* =====================================================
+     STATISTICS
+  ===================================================== */
+
   const totalComplaints =
-    stats?.totalComplaints ?? complaints.length;
+    stats?.totalComplaints ??
+    complaints.length;
 
   const openComplaints =
     stats?.openComplaints ?? 0;
@@ -184,6 +160,10 @@ export default function AdminDashboard() {
   const slaBreachedComplaints =
     stats?.slaBreachedComplaints ?? 0;
 
+  /* =====================================================
+     DATE FORMAT
+  ===================================================== */
+
   const formatDate = (value) => {
     if (!value) {
       return "—";
@@ -195,22 +175,46 @@ export default function AdminDashboard() {
       return "—";
     }
 
-    return date.toLocaleDateString(undefined, {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return date.toLocaleDateString(
+      undefined,
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   };
+
+  /* =====================================================
+     LOADING
+  ===================================================== */
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="admin-dashboard">
+          <div className="admin-loading">
+            Loading admin dashboard...
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  /* =====================================================
+     PAGE
+  ===================================================== */
 
   return (
     <AppLayout>
       <div className="admin-dashboard">
 
-        {/* =========================================
+        {/* =================================================
             HERO
-        ========================================= */}
+        ================================================= */}
 
         <section className="admin-hero">
+
           <div className="admin-hero-content">
 
             <div className="admin-hero-icon">
@@ -218,6 +222,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
+
               <p className="eyebrow">
                 ADMIN CONTROL CENTER
               </p>
@@ -228,14 +233,17 @@ export default function AdminDashboard() {
 
               <p>
                 Monitor complaints, manage users,
-                assign support staff and track
+                monitor complaints and track
                 platform performance.
               </p>
+
             </div>
 
           </div>
 
+
           <div className="admin-hero-meta">
+
             <span>
               Platform status
             </span>
@@ -243,13 +251,15 @@ export default function AdminDashboard() {
             <strong>
               Operational
             </strong>
+
           </div>
+
         </section>
 
 
-        {/* =========================================
+        {/* =================================================
             ERROR
-        ========================================= */}
+        ================================================= */}
 
         {error && (
           <div className="alert error admin-alert">
@@ -257,22 +267,17 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {assignMessage && (
-          <div className="alert success admin-alert">
-            {assignMessage}
-          </div>
-        )}
 
-
-        {/* =========================================
+        {/* =================================================
             KEY METRICS
-        ========================================= */}
+        ================================================= */}
 
         <section className="admin-section">
 
           <div className="admin-section-heading">
 
             <div>
+
               <p className="admin-section-label">
                 SYSTEM OVERVIEW
               </p>
@@ -280,6 +285,7 @@ export default function AdminDashboard() {
               <h2>
                 Key metrics
               </h2>
+
             </div>
 
             <span>
@@ -287,6 +293,7 @@ export default function AdminDashboard() {
             </span>
 
           </div>
+
 
           <div className="admin-kpi-grid">
 
@@ -343,15 +350,16 @@ export default function AdminDashboard() {
         </section>
 
 
-        {/* =========================================
+        {/* =================================================
             QUICK ACCESS
-        ========================================= */}
+        ================================================= */}
 
         <section className="admin-section">
 
           <div className="admin-section-heading">
 
             <div>
+
               <p className="admin-section-label">
                 QUICK ACCESS
               </p>
@@ -359,9 +367,11 @@ export default function AdminDashboard() {
               <h2>
                 Administration
               </h2>
+
             </div>
 
           </div>
+
 
           <div className="admin-quick-actions">
 
@@ -369,6 +379,7 @@ export default function AdminDashboard() {
               to="/admin/users"
               className="admin-quick-card"
             >
+
               <div className="admin-quick-icon blue">
                 ♙
               </div>
@@ -400,6 +411,7 @@ export default function AdminDashboard() {
               to="/admin/complaints"
               className="admin-quick-card"
             >
+
               <div className="admin-quick-icon purple">
                 ▤
               </div>
@@ -411,7 +423,7 @@ export default function AdminDashboard() {
                 </strong>
 
                 <span>
-                  Review, assign and manage complaints
+                  Review and manage complaints
                 </span>
 
                 <small>
@@ -431,15 +443,16 @@ export default function AdminDashboard() {
         </section>
 
 
-        {/* =========================================
+        {/* =================================================
             OPERATIONS
-        ========================================= */}
+        ================================================= */}
 
         <section className="admin-section">
 
           <div className="admin-section-heading">
 
             <div>
+
               <p className="admin-section-label">
                 OPERATIONS
               </p>
@@ -447,6 +460,7 @@ export default function AdminDashboard() {
               <h2>
                 System activity
               </h2>
+
             </div>
 
           </div>
@@ -467,6 +481,7 @@ export default function AdminDashboard() {
                   </span>
 
                   <div>
+
                     <h3>
                       User Distribution
                     </h3>
@@ -474,9 +489,11 @@ export default function AdminDashboard() {
                     <p>
                       Current account roles
                     </p>
+
                   </div>
 
                 </div>
+
 
                 <Link
                   to="/admin/users"
@@ -528,6 +545,7 @@ export default function AdminDashboard() {
                   </span>
 
                   <div>
+
                     <h3>
                       Support Operations
                     </h3>
@@ -535,9 +553,11 @@ export default function AdminDashboard() {
                     <p>
                       Current workload overview
                     </p>
+
                   </div>
 
                 </div>
+
 
                 <Link
                   to="/admin/complaints"
@@ -552,7 +572,7 @@ export default function AdminDashboard() {
               <div className="admin-operation-stat">
 
                 <strong>
-                  {supportUsers.length}
+                  {roleCounts.support}
                 </strong>
 
                 <span>
@@ -565,6 +585,7 @@ export default function AdminDashboard() {
               <div className="admin-small-stats">
 
                 <div>
+
                   <strong>
                     {unassignedComplaints}
                   </strong>
@@ -572,9 +593,12 @@ export default function AdminDashboard() {
                   <span>
                     Unassigned
                   </span>
+
                 </div>
 
+
                 <div>
+
                   <strong>
                     {criticalComplaints}
                   </strong>
@@ -582,6 +606,7 @@ export default function AdminDashboard() {
                   <span>
                     Critical
                   </span>
+
                 </div>
 
               </div>
@@ -593,9 +618,9 @@ export default function AdminDashboard() {
         </section>
 
 
-        {/* =========================================
-            ATTENTION
-        ========================================= */}
+        {/* =================================================
+            ATTENTION REQUIRED
+        ================================================= */}
 
         {(slaBreachedComplaints > 0 ||
           criticalComplaints > 0 ||
@@ -653,15 +678,16 @@ export default function AdminDashboard() {
         )}
 
 
-        {/* =========================================
+        {/* =================================================
             RECENT COMPLAINTS
-        ========================================= */}
+        ================================================= */}
 
         <section className="admin-section">
 
           <div className="admin-section-heading">
 
             <div>
+
               <p className="admin-section-label">
                 COMPLAINTS
               </p>
@@ -669,7 +695,9 @@ export default function AdminDashboard() {
               <h2>
                 Recent activity
               </h2>
+
             </div>
+
 
             <Link
               to="/admin/complaints"
@@ -683,17 +711,17 @@ export default function AdminDashboard() {
 
           <div className="admin-complaints-card">
 
-            {loading ? (
-              <div className="admin-table-state">
-                Loading complaints...
-              </div>
-            ) : recentComplaints.length === 0 ? (
+            {recentComplaints.length === 0 ? (
+
               <div className="admin-table-state">
                 No complaints found.
               </div>
+
             ) : (
 
               <div className="admin-complaint-table">
+
+                {/* TABLE HEADER */}
 
                 <div className="admin-table-header">
 
@@ -710,15 +738,13 @@ export default function AdminDashboard() {
                   </span>
 
                   <span>
-                    Assigned To
-                  </span>
-
-                  <span>
                     Action
                   </span>
 
                 </div>
 
+
+                {/* TABLE ROWS */}
 
                 {recentComplaints.map(
                   (complaint) => (
@@ -754,80 +780,25 @@ export default function AdminDashboard() {
                       {/* PRIORITY */}
 
                       <div>
+
                         <PriorityBadge
                           priority={
                             complaint.priority
                           }
                         />
+
                       </div>
 
 
                       {/* STATUS */}
 
                       <div>
+
                         <StatusBadge
                           status={
                             complaint.status
                           }
                         />
-                      </div>
-
-
-                      {/* ASSIGNMENT */}
-
-                      <div className="admin-assignment-cell">
-
-                        {complaint.assignedToName && (
-                          <div className="admin-current-assignee">
-                            {complaint.assignedToName}
-                          </div>
-                        )}
-
-                        <select
-                          value={
-                            complaint.assignedToId
-                              ? String(
-                                  complaint.assignedToId
-                                )
-                              : ""
-                          }
-                          disabled={
-                            assigningId ===
-                            complaint.id
-                          }
-                          onChange={(event) =>
-                            handleAssignment(
-                              complaint.id,
-                              event.target.value
-                            )
-                          }
-                        >
-
-                          <option value="">
-                            {assigningId ===
-                            complaint.id
-                              ? "Assigning..."
-                              : complaint.assignedToName
-                                ? "Change support"
-                                : "Assign support"}
-                          </option>
-
-                          {supportUsers.map(
-                            (supportUser) => (
-                              <option
-                                key={
-                                  supportUser.id
-                                }
-                                value={
-                                  supportUser.id
-                                }
-                              >
-                                {supportUser.name}
-                              </option>
-                            )
-                          )}
-
-                        </select>
 
                       </div>
 
@@ -846,10 +817,12 @@ export default function AdminDashboard() {
                       </div>
 
                     </div>
+
                   )
                 )}
 
               </div>
+
             )}
 
           </div>
@@ -857,9 +830,9 @@ export default function AdminDashboard() {
         </section>
 
 
-        {/* =========================================
-            SUMMARY
-        ========================================= */}
+        {/* =================================================
+            PLATFORM SUMMARY
+        ================================================= */}
 
         <section className="admin-section">
 
@@ -893,6 +866,7 @@ export default function AdminDashboard() {
             <div className="admin-small-stats admin-summary-stats">
 
               <div>
+
                 <strong>
                   {users.length}
                 </strong>
@@ -900,21 +874,25 @@ export default function AdminDashboard() {
                 <span>
                   Total users
                 </span>
+
               </div>
 
 
               <div>
+
                 <strong>
-                  {supportUsers.length}
+                  {roleCounts.support}
                 </strong>
 
                 <span>
                   Support staff
                 </span>
+
               </div>
 
 
               <div>
+
                 <strong>
                   {openComplaints +
                     inProgressComplaints}
@@ -923,10 +901,12 @@ export default function AdminDashboard() {
                 <span>
                   Active complaints
                 </span>
+
               </div>
 
 
               <div>
+
                 <strong>
                   {resolvedComplaints +
                     closedComplaints}
@@ -935,6 +915,7 @@ export default function AdminDashboard() {
                 <span>
                   Completed
                 </span>
+
               </div>
 
             </div>
@@ -949,9 +930,9 @@ export default function AdminDashboard() {
 }
 
 
-/* =========================================
-   KPI CARD
-========================================= */
+/* =====================================================
+   ADMIN METRIC
+===================================================== */
 
 function AdminMetric({
   label,
@@ -990,9 +971,9 @@ function AdminMetric({
 }
 
 
-/* =========================================
+/* =====================================================
    ROLE COUNT
-========================================= */
+===================================================== */
 
 function RoleCount({
   label,
@@ -1014,9 +995,9 @@ function RoleCount({
 }
 
 
-/* =========================================
+/* =====================================================
    ATTENTION CARD
-========================================= */
+===================================================== */
 
 function AttentionCard({
   title,

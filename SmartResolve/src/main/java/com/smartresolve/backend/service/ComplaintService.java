@@ -1,19 +1,21 @@
 package com.smartresolve.backend.service;
 
+import com.smartresolve.backend.dto.complaint.ComplaintAssignmentRequest;
 import com.smartresolve.backend.dto.complaint.ComplaintRequest;
 import com.smartresolve.backend.dto.complaint.ComplaintResponse;
+import com.smartresolve.backend.dto.complaint.ComplaintStatusRequest;
 import com.smartresolve.backend.entity.Complaint;
+import com.smartresolve.backend.entity.ComplaintHistory;
 import com.smartresolve.backend.entity.User;
 import com.smartresolve.backend.enums.ComplaintStatus;
+import com.smartresolve.backend.repository.ComplaintHistoryRepository;
 import com.smartresolve.backend.repository.ComplaintRepository;
 import com.smartresolve.backend.repository.UserRepository;
-import com.smartresolve.backend.dto.complaint.ComplaintAssignmentRequest;
+
 import org.springframework.stereotype.Service;
-import com.smartresolve.backend.dto.complaint.ComplaintStatusRequest;
-import com.smartresolve.backend.entity.ComplaintHistory;
-import com.smartresolve.backend.repository.ComplaintHistoryRepository;
-import java.util.List;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class ComplaintService {
@@ -22,59 +24,128 @@ public class ComplaintService {
     private final UserRepository userRepository;
     private final SlaService slaService;
     private final ComplaintHistoryRepository complaintHistoryRepository;
-    
+    private final NotificationService notificationService;
+
     public ComplaintService(
             ComplaintRepository complaintRepository,
             UserRepository userRepository,
             ComplaintHistoryRepository complaintHistoryRepository,
-            SlaService slaService) {
+            SlaService slaService,
+            NotificationService notificationService) {
 
         this.complaintRepository = complaintRepository;
         this.userRepository = userRepository;
-        this.complaintHistoryRepository = complaintHistoryRepository;
+        this.complaintHistoryRepository =
+                complaintHistoryRepository;
         this.slaService = slaService;
+        this.notificationService =
+                notificationService;
     }
+
+    /*
+     * =========================================================
+     * CREATE COMPLAINT
+     * =========================================================
+     */
 
     public ComplaintResponse createComplaint(
             ComplaintRequest request,
             String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
-        Complaint complaint = new Complaint();
+        Complaint complaint =
+                new Complaint();
 
-        complaint.setTitle(request.getTitle());
-        complaint.setDescription(request.getDescription());
-        complaint.setPriority(request.getPriority());
-        complaint.setCategory(request.getCategory());
+        complaint.setTitle(
+                request.getTitle()
+        );
 
-        complaint.setStatus(ComplaintStatus.OPEN);
+        complaint.setDescription(
+                request.getDescription()
+        );
+
+        complaint.setPriority(
+                request.getPriority()
+        );
+
+        complaint.setCategory(
+                request.getCategory()
+        );
+
+        complaint.setStatus(
+                ComplaintStatus.OPEN
+        );
+
         complaint.setCreatedBy(user);
 
+        /*
+         * First save:
+         * generates complaint ID and createdAt.
+         */
         Complaint savedComplaint =
                 complaintRepository.save(complaint);
 
+        /*
+         * Calculate SLA.
+         */
         int slaHours =
                 slaService.getSlaHours(
-                        savedComplaint.getPriority());
+                        savedComplaint.getPriority()
+                );
 
         LocalDateTime slaDeadline =
                 slaService.calculateDeadline(
                         savedComplaint.getPriority(),
-                        savedComplaint.getCreatedAt());
+                        savedComplaint.getCreatedAt()
+                );
 
-        savedComplaint.setSlaHours(slaHours);
-        savedComplaint.setSlaDeadline(slaDeadline);
-        savedComplaint.setSlaBreached(false);
+        savedComplaint.setSlaHours(
+                slaHours
+        );
 
+        savedComplaint.setSlaDeadline(
+                slaDeadline
+        );
+
+        savedComplaint.setSlaBreached(
+                false
+        );
+
+        /*
+         * Second save:
+         * stores SLA information.
+         */
         savedComplaint =
-                complaintRepository.save(savedComplaint);
+                complaintRepository.save(
+                        savedComplaint
+                );
 
-        return toResponse(savedComplaint);
+        /*
+         * NEW:
+         * Create notifications after the complaint
+         * has been successfully stored.
+         */
+        notificationService.notifyComplaintCreated(
+                savedComplaint
+        );
+
+        return toResponse(
+                savedComplaint
+        );
     }
-    
+
+    /*
+     * =========================================================
+     * GET ALL COMPLAINTS
+     * =========================================================
+     */
 
     public List<ComplaintResponse> getAllComplaints() {
 
@@ -84,178 +155,414 @@ public class ComplaintService {
                 .toList();
     }
 
-    public ComplaintResponse getComplaintById(Long id) {
+    /*
+     * =========================================================
+     * GET COMPLAINT BY ID
+     * =========================================================
+     */
 
-        Complaint complaint = complaintRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Complaint not found"));
+    public ComplaintResponse getComplaintById(
+            Long id) {
 
-        return toResponse(complaint);
+        Complaint complaint =
+                complaintRepository.findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Complaint not found"
+                                )
+                        );
+
+        return toResponse(
+                complaint
+        );
     }
 
-    public List<ComplaintResponse> getMyComplaints(String email) {
+    /*
+     * =========================================================
+     * GET MY COMPLAINTS
+     * =========================================================
+     */
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+    public List<ComplaintResponse> getMyComplaints(
+            String email) {
+
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
         return complaintRepository
-                .findByCreatedById(user.getId())
+                .findByCreatedById(
+                        user.getId()
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
+
+    /*
+     * =========================================================
+     * GET ASSIGNED COMPLAINTS
+     * =========================================================
+     */
+
     public List<ComplaintResponse> getAssignedComplaints(
             String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
         return complaintRepository
-                .findByAssignedToId(user.getId())
+                .findByAssignedToId(
+                        user.getId()
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    private ComplaintResponse toResponse(Complaint complaint) {
+    /*
+     * =========================================================
+     * ASSIGN / REASSIGN COMPLAINT
+     * =========================================================
+     */
 
-        ComplaintResponse response = new ComplaintResponse();
-
-        response.setId(complaint.getId());
-        response.setTitle(complaint.getTitle());
-        response.setDescription(complaint.getDescription());
-        response.setStatus(complaint.getStatus());
-        response.setPriority(complaint.getPriority());
-        response.setCategory(complaint.getCategory());
-
-        // Created by user
-        if (complaint.getCreatedBy() != null) {
-
-            response.setCreatedById(
-                    complaint.getCreatedBy().getId());
-
-            response.setCreatedByName(
-                    complaint.getCreatedBy().getName());
-
-            response.setCreatedByEmail(
-                    complaint.getCreatedBy().getEmail());
-        }
-
-        // Assigned support user
-        if (complaint.getAssignedTo() != null) {
-
-            response.setAssignedToId(
-                    complaint.getAssignedTo().getId());
-
-            response.setAssignedToName(
-                    complaint.getAssignedTo().getName());
-
-            response.setAssignedToEmail(
-                    complaint.getAssignedTo().getEmail());
-        }
-
-        response.setCreatedAt(complaint.getCreatedAt());
-        response.setUpdatedAt(complaint.getUpdatedAt());
-        response.setResolvedAt(complaint.getResolvedAt());
-        response.setSlaHours(complaint.getSlaHours());
-        response.setSlaDeadline(complaint.getSlaDeadline());
-        response.setSlaBreached(complaint.isSlaBreached());
-        return response;
-    }
     public ComplaintResponse assignComplaint(
             Long complaintId,
             ComplaintAssignmentRequest request) {
 
-        Complaint complaint = complaintRepository.findById(complaintId)
+        Complaint complaint =
+                complaintRepository.findById(
+                        complaintId
+                )
                 .orElseThrow(() ->
-                        new RuntimeException("Complaint not found"));
+                        new RuntimeException(
+                                "Complaint not found"
+                        )
+                );
 
-        User supportUser = userRepository.findById(
-                request.getAssignedToId()
-        ).orElseThrow(() ->
-                new RuntimeException("Support user not found"));
+        User supportUser =
+                userRepository.findById(
+                        request.getAssignedToId()
+                )
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Support user not found"
+                        )
+                );
 
-        if (!supportUser.getRole().name().equals("SUPPORT")) {
+        if (!supportUser
+                .getRole()
+                .name()
+                .equals("SUPPORT")) {
+
             throw new RuntimeException(
-                    "Selected user is not a SUPPORT user");
+                    "Selected user is not a SUPPORT user"
+            );
         }
 
-        complaint.setAssignedTo(supportUser);
+        /*
+         * Store old support user BEFORE replacing it.
+         */
+        User previousSupport =
+                complaint.getAssignedTo();
+
+        /*
+         * If the same support user is selected again,
+         * don't create another notification.
+         */
+        if (previousSupport != null &&
+                previousSupport.getId() != null &&
+                previousSupport.getId().equals(
+                        supportUser.getId()
+                )) {
+
+            return toResponse(
+                    complaint
+            );
+        }
+
+        /*
+         * Assign new support user.
+         */
+        complaint.setAssignedTo(
+                supportUser
+        );
 
         Complaint savedComplaint =
-                complaintRepository.save(complaint);
+                complaintRepository.save(
+                        complaint
+                );
 
-        // Reload complaint so both relationships are available
+        /*
+         * Reload complaint so relationships are available.
+         */
         Complaint updatedComplaint =
-                complaintRepository.findById(savedComplaint.getId())
-                        .orElseThrow(() ->
-                                new RuntimeException("Complaint not found"));
+                complaintRepository.findById(
+                        savedComplaint.getId()
+                )
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Complaint not found"
+                        )
+                );
 
-        return toResponse(updatedComplaint);
+        /*
+         * NEW:
+         * Notify USER + SUPPORT + SUPERVISOR.
+         */
+        notificationService.notifyComplaintAssigned(
+                updatedComplaint,
+                previousSupport,
+                supportUser
+        );
+
+        return toResponse(
+                updatedComplaint
+        );
     }
+
+    /*
+     * =========================================================
+     * UPDATE STATUS
+     * =========================================================
+     */
+
     public ComplaintResponse updateStatus(
             Long complaintId,
             ComplaintStatusRequest request,
             String email) {
 
-        Complaint complaint = complaintRepository.findById(complaintId)
+        Complaint complaint =
+                complaintRepository.findById(
+                        complaintId
+                )
                 .orElseThrow(() ->
-                        new RuntimeException("Complaint not found"));
+                        new RuntimeException(
+                                "Complaint not found"
+                        )
+                );
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
 
-        ComplaintStatus currentStatus = complaint.getStatus();
-        ComplaintStatus newStatus = request.getStatus();
+        ComplaintStatus currentStatus =
+                complaint.getStatus();
 
-        // OPEN → IN_PROGRESS
-        if (currentStatus == ComplaintStatus.OPEN &&
-                newStatus != ComplaintStatus.IN_PROGRESS) {
+        ComplaintStatus newStatus =
+                request.getStatus();
 
-            throw new RuntimeException(
-                    "OPEN complaint can only move to IN_PROGRESS");
-        }
-
-        // IN_PROGRESS → RESOLVED
-        if (currentStatus == ComplaintStatus.IN_PROGRESS &&
-                newStatus != ComplaintStatus.RESOLVED) {
-
-            throw new RuntimeException(
-                    "IN_PROGRESS complaint can only move to RESOLVED");
-        }
-
-        // RESOLVED → CLOSED
-        if (currentStatus == ComplaintStatus.RESOLVED &&
-                newStatus != ComplaintStatus.CLOSED) {
+        /*
+         * OPEN -> IN_PROGRESS
+         */
+        if (currentStatus ==
+                        ComplaintStatus.OPEN &&
+                newStatus !=
+                        ComplaintStatus.IN_PROGRESS) {
 
             throw new RuntimeException(
-                    "RESOLVED complaint can only move to CLOSED");
+                    "OPEN complaint can only move to IN_PROGRESS"
+            );
         }
 
-        // Create history record BEFORE changing status
-        ComplaintHistory history = new ComplaintHistory();
+        /*
+         * IN_PROGRESS -> RESOLVED
+         */
+        if (currentStatus ==
+                        ComplaintStatus.IN_PROGRESS &&
+                newStatus !=
+                        ComplaintStatus.RESOLVED) {
 
-        history.setComplaint(complaint);
-        history.setChangedBy(user);
-        history.setOldStatus(currentStatus);
-        history.setNewStatus(newStatus);
+            throw new RuntimeException(
+                    "IN_PROGRESS complaint can only move to RESOLVED"
+            );
+        }
 
-        complaintHistoryRepository.save(history);
+        /*
+         * RESOLVED -> CLOSED
+         */
+        if (currentStatus ==
+                        ComplaintStatus.RESOLVED &&
+                newStatus !=
+                        ComplaintStatus.CLOSED) {
 
-        // Update complaint
-        complaint.setStatus(newStatus);
+            throw new RuntimeException(
+                    "RESOLVED complaint can only move to CLOSED"
+            );
+        }
 
-        if (newStatus == ComplaintStatus.RESOLVED) {
-            complaint.setResolvedAt(java.time.LocalDateTime.now());
+        /*
+         * Create history BEFORE changing status.
+         */
+        ComplaintHistory history =
+                new ComplaintHistory();
+
+        history.setComplaint(
+                complaint
+        );
+
+        history.setChangedBy(
+                user
+        );
+
+        history.setOldStatus(
+                currentStatus
+        );
+
+        history.setNewStatus(
+                newStatus
+        );
+
+        complaintHistoryRepository.save(
+                history
+        );
+
+        /*
+         * Update complaint.
+         */
+        complaint.setStatus(
+                newStatus
+        );
+
+        if (newStatus ==
+                ComplaintStatus.RESOLVED) {
+
+            complaint.setResolvedAt(
+                    LocalDateTime.now()
+            );
         }
 
         Complaint savedComplaint =
-                complaintRepository.save(complaint);
+                complaintRepository.save(
+                        complaint
+                );
 
-        return toResponse(savedComplaint);
+        /*
+         * NEW:
+         * Notify USER + assigned SUPPORT +
+         * other SUPERVISORS.
+         */
+        notificationService.notifyStatusChanged(
+                savedComplaint,
+                user,
+                currentStatus.name(),
+                newStatus.name()
+        );
+
+        return toResponse(
+                savedComplaint
+        );
     }
 
+    /*
+     * =========================================================
+     * CONVERT ENTITY -> RESPONSE
+     * =========================================================
+     */
+
+    private ComplaintResponse toResponse(
+            Complaint complaint) {
+
+        ComplaintResponse response =
+                new ComplaintResponse();
+
+        response.setId(
+                complaint.getId()
+        );
+
+        response.setTitle(
+                complaint.getTitle()
+        );
+
+        response.setDescription(
+                complaint.getDescription()
+        );
+
+        response.setStatus(
+                complaint.getStatus()
+        );
+
+        response.setPriority(
+                complaint.getPriority()
+        );
+
+        response.setCategory(
+                complaint.getCategory()
+        );
+
+        /*
+         * Created by
+         */
+        if (complaint.getCreatedBy() != null) {
+
+            response.setCreatedById(
+                    complaint.getCreatedBy().getId()
+            );
+
+            response.setCreatedByName(
+                    complaint.getCreatedBy().getName()
+            );
+
+            response.setCreatedByEmail(
+                    complaint.getCreatedBy().getEmail()
+            );
+        }
+
+        /*
+         * Assigned support user
+         */
+        if (complaint.getAssignedTo() != null) {
+
+            response.setAssignedToId(
+                    complaint.getAssignedTo().getId()
+            );
+
+            response.setAssignedToName(
+                    complaint.getAssignedTo().getName()
+            );
+
+            response.setAssignedToEmail(
+                    complaint.getAssignedTo().getEmail()
+            );
+        }
+
+        response.setCreatedAt(
+                complaint.getCreatedAt()
+        );
+
+        response.setUpdatedAt(
+                complaint.getUpdatedAt()
+        );
+
+        response.setResolvedAt(
+                complaint.getResolvedAt()
+        );
+
+        response.setSlaHours(
+                complaint.getSlaHours()
+        );
+
+        response.setSlaDeadline(
+                complaint.getSlaDeadline()
+        );
+
+        response.setSlaBreached(
+                complaint.isSlaBreached()
+        );
+
+        return response;
+    }
 }

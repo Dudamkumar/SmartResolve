@@ -1,157 +1,133 @@
 import { useEffect, useState } from "react";
-
-import userService from "../../services/userService";
 import complaintService from "../../services/complaintService";
 
 export default function Assignment({
-  complaint,
-  onAssigned,
+    complaint,
+    supportUsers = [],
+    refresh
 }) {
-  const [supportUsers, setSupportUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(
-    complaint?.assignedToId
-      ? String(complaint.assignedToId)
-      : ""
-  );
+    const [assigning, setAssigning] = useState(false);
+    const [selectedUserId, setSelectedUserId] = useState(
+        complaint?.assignedToId
+            ? String(complaint.assignedToId)
+            : ""
+    );
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [loadingUsers, setLoadingUsers] =
-    useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+    useEffect(() => {
+        setSelectedUserId(
+            complaint?.assignedToId
+                ? String(complaint.assignedToId)
+                : ""
+        );
+    }, [complaint?.assignedToId]);
 
-  useEffect(() => {
-    const loadSupportUsers = async () => {
-      try {
-        setLoadingUsers(true);
+    const handleAssign = async (event) => {
+        const value = event.target.value;
+
+        if (!value) {
+            return;
+        }
+
+        if (!complaint?.id) {
+            setError("Complaint information is missing.");
+            return;
+        }
+
+        const assignedToId = Number(value);
+
+        if (!assignedToId || Number.isNaN(assignedToId)) {
+            setError("Invalid support user.");
+            return;
+        }
+
+        setSelectedUserId(value);
+        setAssigning(true);
         setError("");
+        setSuccess("");
 
-        const response =
-          await userService.getSupportUsers();
+        try {
+            await complaintService.assign(
+                complaint.id,
+                assignedToId
+            );
 
-        setSupportUsers(
-          Array.isArray(response.data)
-            ? response.data
-            : []
-        );
-      } catch (err) {
-        console.error(
-          "SUPPORT USERS ERROR:",
-          err
-        );
+            setSuccess("Complaint assigned successfully.");
 
-        setError(
-          err.response?.data?.message ||
-            "Unable to load support users."
-        );
-      } finally {
-        setLoadingUsers(false);
-      }
+            if (refresh) {
+                await refresh();
+            }
+
+        } catch (error) {
+            console.error(
+                "ASSIGN COMPLAINT ERROR:",
+                error
+            );
+
+            setError(
+                error.response?.data?.message ||
+                "Unable to assign complaint."
+            );
+        } finally {
+            setAssigning(false);
+        }
     };
 
-    loadSupportUsers();
-  }, []);
+    return (
+        <div className="assignment-box">
 
-  const handleAssign = async (event) => {
-    const value = event.target.value;
+            <div className="assignment-content">
 
-    if (!value) {
-      return;
-    }
+                <strong>
+                    Assign support staff
+                </strong>
 
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
+                <p className="muted">
+                    Select a SUPPORT employee
+                    for this complaint.
+                </p>
 
-      await complaintService.assign(
-        complaint.id,
-        Number(value)
-      );
+            </div>
 
-      setSelectedUser(value);
-
-      setSuccess(
-        "Complaint assigned successfully."
-      );
-
-      if (onAssigned) {
-        await onAssigned();
-      }
-    } catch (err) {
-      console.error(
-        "ASSIGN COMPLAINT ERROR:",
-        err
-      );
-
-      setError(
-        err.response?.data?.message ||
-          "Unable to assign complaint."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="assignment-box">
-
-      <div className="assignment-content">
-
-        <div>
-          <strong>
-            Assign support staff
-          </strong>
-
-          <p className="muted">
-            Assign this complaint to a
-            SUPPORT employee.
-          </p>
-        </div>
-
-        <select
-          value={selectedUser}
-          onChange={handleAssign}
-          disabled={
-            loading ||
-            loadingUsers ||
-            supportUsers.length === 0
-          }
-        >
-          <option value="">
-            {loadingUsers
-              ? "Loading support users..."
-              : supportUsers.length === 0
-                ? "No support users available"
-                : "Select support user"}
-          </option>
-
-          {supportUsers.map((supportUser) => (
-            <option
-              key={supportUser.id}
-              value={supportUser.id}
+            <select
+                value={selectedUserId}
+                disabled={assigning}
+                onChange={handleAssign}
             >
-              {supportUser.name}
-              {" · "}
-              {supportUser.email}
-            </option>
-          ))}
-        </select>
 
-      </div>
+                <option value="">
+                    {assigning
+                        ? "Assigning..."
+                        : complaint?.assignedToName
+                            ? "Change support user"
+                            : "Select support user"
+                    }
+                </option>
 
-      {error && (
-        <div className="alert error">
-          {error}
+                {supportUsers.map((user) => (
+                    <option
+                        key={user.id}
+                        value={user.id}
+                    >
+                        {user.name} · {user.email}
+                    </option>
+                ))}
+
+            </select>
+
+            {error && (
+                <div className="assignment-error">
+                    {error}
+                </div>
+            )}
+
+            {success && (
+                <div className="assignment-success">
+                    {success}
+                </div>
+            )}
+
         </div>
-      )}
-
-      {success && (
-        <div className="alert success">
-          {success}
-        </div>
-      )}
-
-    </div>
-  );
+    );
 }

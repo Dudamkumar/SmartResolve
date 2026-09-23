@@ -14,8 +14,8 @@ public interface NotificationRepository
 
     List<Notification> findByUserOrderByCreatedAtDesc(User user);
 
-    boolean existsByUserAndComplaintAndType(
-            User user,
-            Complaint complaint,
-            NotificationType type);
+        boolean existsByUserAndComplaintAndType(
+                User user,
+                Complaint complaint,
+                NotificationType type);
 }

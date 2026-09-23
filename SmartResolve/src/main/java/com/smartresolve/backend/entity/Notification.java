@@ -4,7 +4,8 @@ import com.smartresolve.backend.enums.NotificationType;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
-
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "notifications")
 public class Notification {
@@ -22,7 +23,8 @@ public class Notification {
     private Complaint complaint;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "type", nullable = false, length = 50)
     private NotificationType type;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -80,6 +82,7 @@ public class Notification {
     public void setRead(boolean read) {
         isRead = read;
     }
+
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

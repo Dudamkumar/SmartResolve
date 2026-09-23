@@ -14,55 +14,41 @@ import java.util.List;
 @Component
 public class SlaMonitoringScheduler {
 
-    private final ComplaintRepository complaintRepository;
-    private final NotificationService notificationService;
+	private final ComplaintRepository complaintRepository;
+	private final NotificationService notificationService;
 
-    public SlaMonitoringScheduler(
-            ComplaintRepository complaintRepository,
-            NotificationService notificationService) {
+	public SlaMonitoringScheduler(ComplaintRepository complaintRepository, NotificationService notificationService) {
 
-        this.complaintRepository = complaintRepository;
-        this.notificationService = notificationService;
-    }
+		this.complaintRepository = complaintRepository;
+		this.notificationService = notificationService;
+	}
 
-    @Scheduled(fixedRate = 60000)
-    public void checkSlaBreaches() {
+	@Scheduled(fixedRate = 60000)
+	public void checkSlaBreaches() {
 
-        LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = LocalDateTime.now();
 
-        System.out.println(
-                "SLA SCHEDULER RUNNING: " + now
-        );
+		System.out.println("SLA SCHEDULER RUNNING: " + now);
 
-        List<Complaint> complaints =
-                complaintRepository.findAll();
+		List<Complaint> complaints = complaintRepository.findAll();
 
-        for (Complaint complaint : complaints) {
+		for (Complaint complaint : complaints) {
 
-            System.out.println(
-                    "Complaint ID: " + complaint.getId()
-                    + " | Status: " + complaint.getStatus()
-                    + " | Deadline: " + complaint.getSlaDeadline()
-                    + " | Breached: " + complaint.isSlaBreached()
-            );
+			System.out.println("Complaint ID: " + complaint.getId() + " | Status: " + complaint.getStatus()
+					+ " | Deadline: " + complaint.getSlaDeadline() + " | Breached: " + complaint.isSlaBreached());
 
-            if (complaint.getStatus() != ComplaintStatus.CLOSED
-                    && complaint.getResolvedAt() == null
-                    && complaint.getSlaDeadline() != null
-                    && now.isAfter(complaint.getSlaDeadline())) {
+			if (complaint.getStatus() != ComplaintStatus.CLOSED && complaint.getResolvedAt() == null
+					&& complaint.getSlaDeadline() != null && now.isAfter(complaint.getSlaDeadline())) {
 
-                if (!complaint.isSlaBreached()) {
-                    complaint.setSlaBreached(true);
-                    complaintRepository.saveAndFlush(complaint);
+				if (!complaint.isSlaBreached()) {
+					complaint.setSlaBreached(true);
+					complaintRepository.saveAndFlush(complaint);
 
-                    System.out.println(
-                            "SLA BREACHED: Complaint ID "
-                                    + complaint.getId());
-                }
+					System.out.println("SLA BREACHED: Complaint ID " + complaint.getId());
+				}
 
-                notificationService
-                        .createSlaBreachNotifications(complaint);
-            }
-        }
-    }
+				notificationService.createSlaBreachNotifications(complaint);
+			}
+		}
+	}
 }

@@ -36,7 +36,7 @@ export default function StatusActions({
       setError("");
       setSuccess("");
 
-      await complaintService.updateStatus(
+      const response = await complaintService.updateStatus(
         complaintId,
         selectedStatus
       );
@@ -44,7 +44,12 @@ export default function StatusActions({
       setSuccess("Complaint status updated successfully.");
 
       if (onUpdated) {
-        await onUpdated();
+        await onUpdated(
+          response.data || {
+            id: complaintId,
+            status: selectedStatus,
+          }
+        );
       }
     } catch (err) {
       console.error(err);

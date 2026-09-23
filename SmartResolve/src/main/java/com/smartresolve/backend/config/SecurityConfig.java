@@ -39,30 +39,16 @@ public class SecurityConfig {
             HttpSecurity http) throws Exception {
 
         http
-            // =====================================================
-            // CSRF
-            // =====================================================
             .csrf(csrf -> csrf.disable())
 
-            // =====================================================
-            // CORS
-            // =====================================================
             .cors(cors -> {})
 
-            // =====================================================
-            // SESSION
-            // =====================================================
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.IF_REQUIRED
                 )
             )
 
-            // =====================================================
-            // API ERROR HANDLING
-            // Prevent API requests from being redirected to
-            // Google OAuth login.
-            // =====================================================
             .exceptionHandling(exception ->
                 exception.defaultAuthenticationEntryPointFor(
                     new HttpStatusEntryPoint(
@@ -74,31 +60,27 @@ public class SecurityConfig {
                 )
             )
 
-            // =====================================================
-            // AUTHORIZATION
-            // =====================================================
             .authorizeHttpRequests(auth -> auth
 
-                // -------------------------------------------------
-                // PUBLIC AUTH ENDPOINTS
-                // -------------------------------------------------
-
+                // =========================
+                // PUBLIC AUTHENTICATION
+                // =========================
                 .requestMatchers(
                     "/api/auth/register",
                     "/api/auth/login"
                 ).permitAll()
 
-                // Google OAuth
+                // =========================
+                // GOOGLE OAUTH2
+                // =========================
                 .requestMatchers(
                     "/oauth2/**",
                     "/login/**"
                 ).permitAll()
 
-
-                // -------------------------------------------------
-                // TEST ENDPOINTS
-                // -------------------------------------------------
-
+                // =========================
+                // ROLE TEST ENDPOINTS
+                // =========================
                 .requestMatchers("/api/test/user")
                     .hasRole("USER")
 
@@ -111,39 +93,32 @@ public class SecurityConfig {
                 .requestMatchers("/api/test/admin")
                     .hasRole("ADMIN")
 
-
-                // -------------------------------------------------
-                // USER MANAGEMENT
-                // -------------------------------------------------
-
-                // Supervisor and Admin can load SUPPORT users.
-                // This MUST come before /api/users/**
+                // =========================
+                // SUPPORT USERS
+                // Only SUPERVISOR can get
+                // support staff for assignment
+                // =========================
                 .requestMatchers("/api/users/support")
-                    .hasAnyRole(
-                        "SUPERVISOR",
-                        "ADMIN"
-                    )
+                    .hasRole("SUPERVISOR")
 
-                // All other user-management operations are ADMIN only.
+                // =========================
+                // USER MANAGEMENT
+                // ADMIN only
+                // =========================
                 .requestMatchers("/api/users/**")
                     .hasRole("ADMIN")
 
-
-                // -------------------------------------------------
+                // =========================
                 // COMPLAINT ASSIGNMENT
-                // -------------------------------------------------
-
+                // SUPERVISOR only
+                // =========================
                 .requestMatchers("/api/complaints/*/assign")
-                    .hasAnyRole(
-                        "ADMIN",
-                        "SUPERVISOR"
-                    )
+                    .hasRole("SUPERVISOR")
 
-
-                // -------------------------------------------------
+                // =========================
                 // COMPLAINT STATUS
-                // -------------------------------------------------
-
+                // SUPPORT + SUPERVISOR + ADMIN
+                // =========================
                 .requestMatchers("/api/complaints/*/status")
                     .hasAnyRole(
                         "SUPPORT",
@@ -151,11 +126,10 @@ public class SecurityConfig {
                         "ADMIN"
                     )
 
-
-                // -------------------------------------------------
-                // COMPLAINT COMMENTS
-                // -------------------------------------------------
-
+                // =========================
+                // COMMENTS
+                // All logged-in roles
+                // =========================
                 .requestMatchers(
                     "/api/complaints/*/comments/**"
                 )
@@ -166,33 +140,29 @@ public class SecurityConfig {
                     "ADMIN"
                 )
 
-
-                // -------------------------------------------------
+                // =========================
                 // NOTIFICATIONS
-                // -------------------------------------------------
-
+                // =========================
                 .requestMatchers("/api/notifications")
                     .authenticated()
 
                 .requestMatchers("/api/notifications/**")
                     .authenticated()
 
-
-                // -------------------------------------------------
+                // =========================
                 // DASHBOARD
-                // -------------------------------------------------
-
+                // SUPERVISOR + ADMIN
+                // =========================
                 .requestMatchers("/api/dashboard")
                     .hasAnyRole(
                         "SUPERVISOR",
                         "ADMIN"
                     )
 
-
-                // -------------------------------------------------
+                // =========================
                 // ASSIGNED COMPLAINTS
-                // -------------------------------------------------
-
+                // SUPPORT + SUPERVISOR + ADMIN
+                // =========================
                 .requestMatchers("/api/complaints/assigned")
                     .hasAnyRole(
                         "SUPPORT",
@@ -200,27 +170,26 @@ public class SecurityConfig {
                         "ADMIN"
                     )
 
-
-                // -------------------------------------------------
-                // ALL OTHER REQUESTS
-                // -------------------------------------------------
-
+                // =========================
+                // EVERYTHING ELSE
+                // Requires login
+                // =========================
                 .anyRequest()
                     .authenticated()
             )
 
-            // =====================================================
-            // GOOGLE OAUTH2
-            // =====================================================
+            // =========================
+            // GOOGLE LOGIN
+            // =========================
             .oauth2Login(oauth ->
                 oauth.successHandler(
                     oAuth2SuccessHandler
                 )
             )
 
-            // =====================================================
-            // JWT AUTHENTICATION FILTER
-            // =====================================================
+            // =========================
+            // JWT FILTER
+            // =========================
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class

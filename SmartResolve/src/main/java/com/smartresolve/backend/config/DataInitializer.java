@@ -16,24 +16,17 @@ public class DataInitializer {
     CommandLineRunner createAdmin(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder) {
-
         return args -> {
-
             String adminEmail = "admin@smartresolve.com";
-
             if (!userRepository.existsByEmail(adminEmail)) {
-
                 User admin = new User();
-
                 admin.setName("SmartResolve Admin");
                 admin.setEmail(adminEmail);
                 admin.setPassword(
                         passwordEncoder.encode("Admin@123")
                 );
                 admin.setRole(Role.ADMIN);
-
                 userRepository.save(admin);
-
                 System.out.println(
                         "Default ADMIN user created: "
                                 + adminEmail
