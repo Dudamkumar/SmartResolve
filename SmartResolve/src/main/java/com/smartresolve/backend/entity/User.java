@@ -1,15 +1,12 @@
 package com.smartresolve.backend.entity;
-
 import jakarta.persistence.*;
 import java.time.LocalDateTime;;
 @Entity 
 @Table(name="users")
 public class User {
-
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
-	
 	private String name;
 	@Column(nullable=false,unique=true)
 	private String email;
@@ -18,7 +15,6 @@ public class User {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable=false)
 	private Role role;
-	//Relationship between department and user
 	@ManyToOne
 	@JoinColumn(name="department_id")
 	private Department department;
@@ -27,7 +23,6 @@ public class User {
 	public User() {
 		
 	}
-	//Getters and setters
 	public Long getId() {
 	return id;
 	}
